@@ -6,14 +6,7 @@ Datenaufbereitung und Exploration des **UCI Hydraulic Systems Dataset** für Con
 
 ---
 
-## 🚨 WICHTIG: Datenstruktur-Korrektur
-
-### ❌ Falsche Interpretation (ursprünglich):
-- Alle 43.680 Zeitpunkte als separate Features behandelt
-- → 43.680 Spalten → ~1,9 Milliarden Paarvergleiche für Korrelation
-- → Nicht praktikabel!
-
-### ✅ Korrekte Interpretation:
+### Interpretation:
 Die Rohdaten sind **Zeitreihen**:
 - **Zeilen** = Zyklen (2.205 Messzyklen à 60 Sekunden)
 - **Spalten** = Zeitpunkte innerhalb eines Zyklus
@@ -93,7 +86,7 @@ pip install -r requirements.txt
 python prep_corrected.py
 ```
 
-**Laufzeit:** ~5-10 Sekunden ✅ (statt 1+ Stunde ❌)
+**Laufzeit:** ~5-10 Sekunden
 
 ### 3. Interaktive Exploration
 Öffne `notebooks/01_data_exploration.ipynb` in Jupyter/VS Code
