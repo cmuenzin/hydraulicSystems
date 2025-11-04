@@ -80,7 +80,14 @@ def load_and_aggregate_sensors(data_path: str = "data") -> pd.DataFrame:
     
     print(f"[load_and_aggregate_sensors] Lade und aggregiere Sensordaten aus '{data_path}'...\n")
     
-    sensor_files = sorted(data_dir.glob('*.txt'))
+    # Nur echte Sensor-Dateien laden (keine Dokumentation)
+    # Sensor-Namen: CE, CP, EPS1, FS1, FS2, PS1-6, SE, TS1-4, VS1
+    sensor_names = ['ce', 'cp', 'eps1', 'fs1', 'fs2', 'ps1', 'ps2', 'ps3', 
+                    'ps4', 'ps5', 'ps6', 'se', 'ts1', 'ts2', 'ts3', 'ts4', 'vs1']
+    
+    sensor_files = [data_dir / f"{name.upper()}.txt" for name in sensor_names]
+    sensor_files = [f for f in sensor_files if f.exists()]
+    sensor_files = sorted(sensor_files)
     
     for file_path in sensor_files:
         sensor_name = file_path.stem.lower()
