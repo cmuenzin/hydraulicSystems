@@ -1,207 +1,213 @@
 # Hydraulic Systems - Data Preparation
 
-## 📊 Projekt-Übersicht
+## � Was ist das hier?
 
-Datenaufbereitung und Exploration des **UCI Hydraulic Systems Dataset** für Condition Monitoring.
+Dieses Projekt bereitet den **UCI Hydraulic Systems Dataset** auf — ein Datensatz mit Sensor-Messungen von einem Hydraulik-Teststand.
 
----
+**Die Challenge:** Die Rohdaten haben **43.680 Spalten**. Ja, richtig gelesen! 🤯
 
-### Interpretation:
-Die Rohdaten sind **Zeitreihen**:
-- **Zeilen** = Zyklen (2.205 Messzyklen à 60 Sekunden)
-- **Spalten** = Zeitpunkte innerhalb eines Zyklus
-
-**Sensor-Sampling-Raten:**
-| Sensor | Einheit | Sampling | Spalten |
-|--------|---------|----------|---------|
-| PS1-PS6 | bar | 100 Hz | 6.000 |
-| EPS1 | W | 100 Hz | 6.000 |
-| FS1-FS2 | l/min | 10 Hz | 600 |
-| TS1-TS4 | °C | 1 Hz | 60 |
-| VS1 | mm/s | 1 Hz | 60 |
-| CE, CP, SE | %, kW, % | 1 Hz | 60 |
+Das ist viel zu viel für sinnvolle Analysen. Deshalb machen wir hier **Feature Engineering** und reduzieren die Daten auf überschaubare **136 Features**.
 
 ---
 
-## 🎯 Lösung: Feature Engineering
+## 🔍 Der Datensatz
 
-Statt alle Zeitpunkte zu nutzen, extrahieren wir **aggregierte Features** pro Zyklus:
+### Was wurde gemessen?
 
-**8 Features pro Sensor:**
-- `mean` - Durchschnitt
-- `std` - Standardabweichung (Variabilität)
-- `min` - Minimum
-- `max` - Maximum
-- `median` - Median
-- `q25` - 25%-Quantil
-- `q75` - 75%-Quantil
-- `range` - Spannweite (max - min)
+Ein Hydraulik-Teststand wurde **2.205 mal** für jeweils **60 Sekunden** durchlaufen. 
 
-**Ergebnis:**
-- 17 Sensoren × 8 Features = **136 Features**
-- 5 Zielvariablen
-- **141 Spalten gesamt** (statt 43.680!)
+Dabei wurden **17 Sensoren** ausgelesen:
+- **Drucksensoren** (PS1-PS6): Druck in bar
+- **Temperatursensoren** (TS1-TS4): Temperatur in °C  
+- **Durchflusssensoren** (FS1-FS2): Volumenstrom in l/min
+- **Vibrationssensor** (VS1): Vibration in mm/s
+- **Motor-Power** (EPS1): Leistung in Watt
+- **Effizienz-Sensoren** (CE, CP, SE): Kühleffizienz, Kühlleistung, Effizienzfaktor
+
+### Das Problem: Zeitreihen-Daten
+
+Die Sensoren messen mit unterschiedlichen **Sampling-Raten**:
+
+| Sensor | Rate | Messpunkte pro Zyklus |
+|--------|------|---------------------|
+| PS1-PS6, EPS1 | 100 Hz | 6.000 |
+| FS1-FS2 | 10 Hz | 600 |
+| TS1-TS4, VS1, CE, CP, SE | 1 Hz | 60 |
+
+**Insgesamt:** 2.205 Zyklen × 43.680 Zeitpunkte = viel zu viele Spalten!
+
+### Was wollen wir vorhersagen?
+
+Der Datensatz enthält **5 Zielvariablen** (`docs/profile.txt`), die den Zustand der Hydraulik beschreiben:
+
+1. **Kühler-Zustand** (cooler_condition):
+   - 3 = kurz vorm Totalausfall
+   - 20 = reduzierte Effizienz  
+   - 100 = volle Effizienz
+
+2. **Ventil-Zustand** (valve_condition):
+   - 73-100% (optimal bis defekt)
+
+3. **Pumpen-Leckage** (pump_leakage):
+   - 0 = keine, 1 = schwach, 2 = stark
+
+4. **Akkumulator-Druck** (accumulator_pressure):
+   - 90-130 bar (defekt bis optimal)
+
+5. **Stabilitäts-Flag** (stable_flag):
+   - 0 = stabil, 1 = instabil
 
 ---
 
-## 📁 Ordnerstruktur
+## � Unsere Lösung: Feature Engineering
 
+Statt alle 43.680 Zeitpunkte einzeln zu analysieren, **aggregieren** wir die Zeitreihen pro Sensor:
+
+### Die 8 Features pro Sensor:
+
+| Feature | Beschreibung | Warum wichtig? |
+|---------|--------------|----------------|
+| `mean` | Durchschnitt | Typischer Wert während des Zyklus |
+| `median` | Median | Robuster gegen Ausreißer |
+| `std` | Standardabweichung | Wie stark schwankt der Sensor? |
+| `min` | Minimum | Niedrigster Wert |
+| `max` | Maximum | Höchster Wert |
+| `q25` | 25%-Quantil | Unteres Quartil |
+| `q75` | 75%-Quantil | Oberes Quartil |
+| `range` | Spannweite (max - min) | Bandbreite der Werte |
+
+**Ergebnis:**  
+17 Sensoren × 8 Features = **136 Features** (statt 43.680!) 🎉
+
+---
+
+## 🚀 Installation & Ausführung
+
+### 0. Daten herunterladen (falls noch nicht vorhanden)
+
+Die Rohdaten sind **nicht** im Repo enthalten (zu groß). Lade sie hier herunter:
+
+👉 [UCI Machine Learning Repository - Hydraulic Systems](https://archive.ics.uci.edu/ml/datasets/Condition+monitoring+of+hydraulic+systems)
+
+Entpacke die ZIP und kopiere die `.txt`-Dateien in den `data/` Ordner:
 ```
-HydraulicSystems/
-├── data/              # Rohdaten (17 .txt-Dateien)
-│   ├── CE.txt         # Cooling efficiency (1 Hz, 60 Spalten)
-│   ├── PS1.txt        # Pressure Sensor 1 (100 Hz, 6000 Spalten)
-│   └── ...
-├── docs/              # Dokumentation
-│   ├── description.txt
-│   ├── documentation.txt
-│   └── profile.txt    # Zielvariablen (5 Spalten)
-├── out/               # Exportierte Ergebnisse
-│   ├── features_complete.parquet  ⭐ HAUPTDATEI
-│   ├── features_complete.csv
-│   ├── feature_stats.csv
-│   ├── correlation.csv
-│   ├── correlation_heatmap.png
-│   ├── mutual_information.csv
-│   ├── feature_distributions.png
-│   └── boxplots_by_target.png
-├── notebooks/
-│   └── 01_data_exploration.ipynb  # Interaktive Exploration
-├── prep_corrected.py  ⭐ KORRIGIERTES SKRIPT
-├── prep.py            # (alt - nicht verwenden!)
-└── requirements.txt
+data/
+├── CE.txt
+├── CP.txt
+├── EPS1.txt
+├── FS1.txt
+├── FS2.txt
+├── PS1.txt
+├── PS2.txt
+├── PS3.txt
+├── PS4.txt
+├── PS5.txt
+├── PS6.txt
+├── SE.txt
+├── TS1.txt
+├── TS2.txt
+├── TS3.txt
+├── TS4.txt
+└── VS1.txt
 ```
 
----
+Außerdem: `docs/profile.txt` (Zielvariablen) muss ebenfalls aus dem Download stammen.
 
-## 🚀 Schnellstart
-
-### 1. Installation
+### 1. Requirements installieren
 ```powershell
 pip install -r requirements.txt
 ```
 
-### 2. Datenaufbereitung ausführen
+### 2. Datenaufbereitung starten
 ```powershell
 python prep_corrected.py
 ```
 
 **Laufzeit:** ~5-10 Sekunden
 
-### 3. Interaktive Exploration
-Öffne `notebooks/01_data_exploration.ipynb` in Jupyter/VS Code
+### 3. Ergebnisse ansehen
+Die Outputs landen im `out/` Ordner:
+- `features_complete.csv` — Der fertige Datensatz (2.205 × 141)
+- `feature_stats.csv` — Statistiken (mean, std, min, max, ...)
+- `correlation.csv` + `correlation_heatmap.png` — Korrelationen
+- `mutual_information.csv` — Feature Importance
+- Verschiedene Plots (Verteilungen, Boxplots)
 
 ---
 
-## 📤 Ausgabe-Dateien
+## 📊 Was haben wir herausgefunden?
 
-### Hauptdatensatz
-- **`features_complete.parquet`** - Kompakt, schnell (empfohlen)
-- **`features_complete.csv`** - Lesbar, größer
+### 1. Datenqualität: Top! ✓
+- **Keine Missing Values** im Datensatz
+- Nur wenige Typos, die automatisch bereinigt wurden
+- Alle 2.205 Zyklen komplett
 
-**Struktur:**
-- 2.205 Zeilen (Zyklen)
-- 136 Feature-Spalten
-- 5 Zielvariablen-Spalten
+### 2. Welche Features sind wichtig?
 
-### Analysen
-- **`feature_stats.csv`** - Deskriptive Statistiken (count, mean, std, min, max, missing%)
-- **`correlation.csv`** - Pearson-Korrelationsmatrix (136×136)
-- **`correlation_heatmap.png`** - Visualisierung
-- **`mutual_information.csv`** - Feature Importance für `cooler_condition`
+Die **Top 5 Features** für die Vorhersage des Kühler-Zustands (laut Mutual Information):
 
-### Visualisierungen
-- **`feature_distributions.png`** - Histogramme der Mean-Features
-- **`boxplots_by_target.png`** - Feature-Verteilungen nach Cooler Condition
+1. `ce_max` — Maximale Kühleffizienz (!)
+2. `ce_q75` — 75%-Quantil der Kühleffizienz
+3. `ce_median` — Median der Kühleffizienz
+4. `ce_mean` — Durchschnittliche Kühleffizienz
+5. `ce_min` — Minimale Kühleffizienz
 
----
+**Erkenntnis:** Der **Cooling Efficiency Sensor (CE)** ist extrem wichtig für die Kühler-Diagnose! 
 
-## 🎯 Zielvariablen (aus profile.txt)
+Das macht Sinn: Wenn der Kühler kaputt geht, sinkt die Kühleffizienz direkt. 💡
 
-| Variable | Werte | Bedeutung |
-|----------|-------|-----------|
-| **cooler_condition** | 3, 20, 100 | Kühler-Zustand (3=defekt, 100=optimal) |
-| **valve_condition** | 73, 80, 90, 100 | Ventil-Zustand |
-| **pump_leakage** | 0, 1, 2 | Pumpen-Leckage-Level |
-| **accumulator_pressure** | 90, 100, 115, 130 | Akkumulator-Druck (bar) |
-| **stable_flag** | 0, 1 | Stabilitäts-Flag |
+### 3. Korrelationen
 
----
+Viele Features sind **stark korreliert** (z.B. `ps1_mean` mit `ps2_mean`):
+- Macht Sinn: Die Drucksensoren messen ähnliche Phänomene
+- Bedeutet: Wir könnten evtl. Features reduzieren (Feature Selection)
+- Für erste Analysen ok, für ML später optimierbar
 
-## 🔍 Top Feature Importance
+### 4. Verteilungen
 
-**Mutual Information für `cooler_condition`:**
-
-1. `ce_max` - 1.093
-2. `ce_q75` - 1.093
-3. `ce_median` - 1.089
-4. `ce_mean` - 1.089
-5. `ce_min` - 1.088
-
-→ **Cooling Efficiency (CE)** ist das wichtigste Feature für Kühler-Zustand!
+Die meisten Features zeigen **Normalverteilung** oder zumindest symmetrische Verteilungen:
+- Gut für viele ML-Algorithmen!
+- Keine extremen Schiefe
+- Ausreißer sind vorhanden, aber moderat
 
 ---
 
-## 📊 Nächste Schritte
+## 🎯 Nächste Schritte (für ML-Projekte)
 
-### Für Modellierung:
-```python
-import pandas as pd
+Falls du später damit arbeiten willst:
 
-# Lade Daten
-df = pd.read_parquet('out/features_complete.parquet')
+1. **Feature Selection:** Reduziere redundante Features (Korrelation > 0.9)
+2. **Modellierung:** Klassifikation der Zielvariablen (z.B. Random Forest, SVM)
+3. **Cross-Validation:** Teste die Modelle robust
+4. **Anomalie-Erkennung:** Finde ungewöhnliche Zyklen
 
-# Features & Targets trennen
-features = df.drop(columns=['cooler_condition', 'valve_condition', 
-                             'pump_leakage', 'accumulator_pressure', 'stable_flag'])
-target = df['cooler_condition']  # Oder andere Zielvariable
+Aber: **Für dieses Modul sind wir fertig!** ✓
 
-# → Machine Learning (Klassifikation/Regression)
+---
+
+## 📁 Repo-Struktur
+
+```
+HydraulicSystems/
+├── data/                  # Rohdaten (17 .txt-Dateien)
+├── docs/                  # Dokumentation + profile.txt (Zielvariablen)
+├── notebooks/             # Jupyter Notebook für Exploration
+├── out/                   # Generierte Outputs (CSVs, PNGs)
+├── prep_corrected.py      # ⭐ DAS Hauptskript
+├── archive_prep.py        # Alte Version (nur als Referenz)
+└── requirements.txt
 ```
 
-### Mögliche Analysen:
-- ✅ **Klassifikation:** Vorhersage von Fehlertypen
-- ✅ **Anomalie-Erkennung:** Ungewöhnliche Zyklus-Muster
-- ✅ **Feature Selection:** Wichtigste Sensoren identifizieren
-- ✅ **Time Series Analysis:** Trend-Erkennung über Zyklen
+---
+
+## 📚 Quellen
+
+- **Dataset:** [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Condition+monitoring+of+hydraulic+systems)
+- **Paper:** Helwig et al., "Condition Monitoring of a Complex Hydraulic System Using Multivariate Statistics" (2015)
 
 ---
 
-## 📝 Technische Details
+**Erstellt:** November 2025  
+**Level:** Data Preparation (Einsteiger-Modul)  
+**Ziel:** Zeitreihen → kompakte Features → sauberer Datensatz ✓
 
-### Dependencies
-```
-pandas
-numpy
-matplotlib
-seaborn
-scikit-learn
-pyarrow
-```
-
-### Performance
-- **Alte Version:** 43.680 Features → ~1h für Korrelation
-- **Neue Version:** 136 Features → ~5 Sekunden ✅
-
----
-
-## ✅ Akzeptanzkriterien (erfüllt)
-
-- ✅ `out/features_complete.parquet` existiert (2.205 × 141)
-- ✅ `out/feature_stats.csv` existiert
-- ✅ `out/correlation.csv` + Heatmap PNG existieren
-- ✅ `out/mutual_information.csv` existiert
-- ✅ Notebook `01_data_exploration.ipynb` läuft fehlerfrei
-- ✅ Laufzeit < 1 Minute
-
----
-
-## 📚 Referenzen
-
-- **Dataset:** [UCI Machine Learning Repository - Condition monitoring of hydraulic systems](https://archive.ics.uci.edu/ml/datasets/Condition+monitoring+of+hydraulic+systems)
-- **Paper:** Schneider et al., "Investigate Sensor Data of Hydraulic Test Rig"
-
----
-
-**Erstellt:** Oktober 2025  
-**Version:** 2.0 (Korrigiert)

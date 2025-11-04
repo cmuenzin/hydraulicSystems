@@ -1,12 +1,20 @@
 """
-Hydraulic Systems - Data Preparation (Korrigierte Version)
-===========================================================
+Hydraulic Systems - Data Preparation
+=====================================
 Feature Extraction aus Zeitreihen-Sensordaten
 
-WICHTIG: Die Rohdaten sind Zeitreihen!
-- Zeilen = Zyklen (2205)
-- Spalten = Zeitpunkte innerhalb eines 60s-Zyklus
-- Wir extrahieren aggregierte Features (mean, std, min, max, etc.)
+KONZEPT:
+Die Rohdaten sind Zeitreihen mit 43.680 Spalten - viel zu viel!
+Deshalb: Feature Engineering = Zeitreihen pro Sensor zusammenfassen
+
+- Rohdaten: Zeilen = Zyklen (2205), Spalten = Zeitpunkte (bis zu 6000 pro Sensor)
+- Output: 136 aggregierte Features (8 pro Sensor)
+  
+Warum diese 8 Features?
+- mean/median: Typischer Wert während des Zyklus
+- min/max: Extremwerte zeigen Spitzen/Täler
+- std: Wie stark schwankt der Sensor?
+- q25/q75/range: Streuung und Bandbreite
 """
 
 import pandas as pd
@@ -20,21 +28,31 @@ from sklearn.feature_selection import mutual_info_classif
 
 def extract_features(df: pd.DataFrame, sensor_name: str) -> pd.DataFrame:
     """
-    Extrahiert aggregierte Features aus Zeitreihen-DataFrame.
+    Extrahiert 8 aggregierte Features aus Zeitreihen-DataFrame.
+    
+    Warum aggregieren? 
+    - Ein Sensor liefert bis zu 6000 Werte pro Zyklus
+    - Für Analysen/ML brauchen wir kompakte, aussagekräftige Features
+    
+    Die 8 Features beschreiben:
+    - Lage: mean, median (typischer Wert)
+    - Streuung: std (Variabilität), range (Spannweite)
+    - Extrema: min, max (Ausschläge)
+    - Verteilung: q25, q75 (Quartile)
     
     Args:
         df: DataFrame mit Zyklen (Zeilen) × Zeitpunkten (Spalten)
-        sensor_name: Name des Sensors (z.B. 'ts1')
+        sensor_name: Name des Sensors (z.B. 'ts1', 'ps2')
     
     Returns:
-        DataFrame mit aggregierten Features pro Zyklus
+        DataFrame mit 8 Features pro Zyklus
     """
     features = pd.DataFrame()
     
-    # Konvertiere zu numerisch
+    # Konvertiere zu numerisch (bereinigt automatisch Typos → NaN)
     df_numeric = df.apply(pd.to_numeric, errors='coerce')
     
-    # Aggregationen über Zeitachse (axis=1)
+    # Aggregationen über Zeitachse (axis=1 = über Spalten)
     features[f'{sensor_name}_mean'] = df_numeric.mean(axis=1)
     features[f'{sensor_name}_std'] = df_numeric.std(axis=1)
     features[f'{sensor_name}_min'] = df_numeric.min(axis=1)
@@ -112,7 +130,11 @@ def load_targets(profile_path: str = "docs/profile.txt") -> pd.DataFrame:
 
 def compute_statistics(df: pd.DataFrame, feature_cols: list) -> pd.DataFrame:
     """
-    Berechnet Basis-Statistiken für Features.
+    Berechnet Basis-Statistiken für alle Features.
+    
+    Gibt uns Überblick über:
+    - Verteilungen (mean, std, min, max, Quartile)
+    - Datenqualität (Missing Values)
     
     Args:
         df: Kompletter DataFrame
@@ -127,7 +149,7 @@ def compute_statistics(df: pd.DataFrame, feature_cols: list) -> pd.DataFrame:
     stats['n_missing'] = df[feature_cols].isna().sum()
     stats['pct_missing'] = 100 * stats['n_missing'] / len(df)
     
-    # Reorder columns
+    # Reorder columns für bessere Übersicht
     stats = stats[['count', 'n_missing', 'pct_missing', 'mean', 'std', 'min', '25%', '50%', '75%', 'max']]
     
     stats.to_csv("out/feature_stats.csv")
@@ -139,6 +161,11 @@ def compute_statistics(df: pd.DataFrame, feature_cols: list) -> pd.DataFrame:
 def compute_correlation(df: pd.DataFrame, feature_cols: list) -> pd.DataFrame:
     """
     Berechnet Korrelationsmatrix und erstellt Heatmap.
+    
+    Warum Korrelation?
+    - Zeigt uns redundante Features (hohe Korrelation = ähnliche Info)
+    - Hilft beim Feature Selection
+    - Erkennt Zusammenhänge zwischen Sensoren
     
     Args:
         df: Kompletter DataFrame
@@ -153,7 +180,7 @@ def compute_correlation(df: pd.DataFrame, feature_cols: list) -> pd.DataFrame:
     corr.to_csv("out/correlation.csv")
     print(f"  ✓ Korrelation gespeichert: out/correlation.csv")
     
-    # Heatmap
+    # Heatmap für visuelle Übersicht
     plt.figure(figsize=(20, 18))
     sns.heatmap(corr, cmap='coolwarm', center=0, square=True, 
                 linewidths=0.1, cbar_kws={"shrink": 0.8})
@@ -171,6 +198,12 @@ def compute_mutual_information(df: pd.DataFrame, feature_cols: list,
     """
     Berechnet Mutual Information für Features vs. Zielvariable.
     
+    OPTIONAL: Für Einsteiger nicht zwingend notwendig!
+    Mutual Information zeigt, welche Features am besten zur Vorhersage geeignet sind.
+    
+    Einfacher Alternative: Korrelation mit Target verwenden:
+    df.corrwith(df['cooler_condition']).abs().sort_values(ascending=False)
+    
     Args:
         df: Kompletter DataFrame
         feature_cols: Liste der Feature-Spalten
@@ -180,6 +213,7 @@ def compute_mutual_information(df: pd.DataFrame, feature_cols: list,
         DataFrame mit MI-Scores
     """
     print(f"[compute_mutual_information] Berechne Mutual Information für '{target_col}'...")
+    print("  (Optional: Dieser Schritt kann übersprungen werden)")
     
     X = df[feature_cols].fillna(0)
     y = df[target_col]
@@ -256,14 +290,28 @@ def create_visualizations(df: pd.DataFrame, feature_cols: list):
 def main():
     """
     Hauptfunktion: Führt komplette Datenaufbereitung durch.
+    
+    Ablauf:
+    1. Rohdaten laden (17 Sensor-Dateien aus data/)
+    2. Feature Engineering: Zeitreichen → 8 Features pro Sensor
+    3. Zielvariablen laden (docs/profile.txt)
+    4. Statistiken berechnen
+    5. Korrelationsanalyse
+    6. Mutual Information (optional)
+    7. Visualisierungen
+    8. Export nach out/
     """
     print("=" * 70)
-    print("HYDRAULIC SYSTEMS - DATA PREPARATION (KORRIGIERT)")
+    print("HYDRAULIC SYSTEMS - DATA PREPARATION")
     print("=" * 70)
-    print("\nKonzept: Feature Extraction aus Zeitreihen")
-    print("  • Rohdaten: Zyklen × Zeitpunkte")
-    print("  • Features: Aggregationen pro Zyklus (mean, std, min, max, etc.)\n")
+    print("\nKonzept: Feature Engineering aus Zeitreihen")
+    print("  • Problem: 43.680 Spalten (Rohdaten) sind zu viel!")
+    print("  • Lösung: Aggregation → 136 Features (8 pro Sensor)")
+    print("  • Vorteil: Kompakt, aussagekräftig, analysierbar\n")
     print("=" * 70 + "\n")
+    
+    # Erstelle Output-Verzeichnis falls nicht vorhanden
+    Path('out').mkdir(exist_ok=True)
     
     # 1. Lade und aggregiere Sensordaten
     features_df = load_and_aggregate_sensors("data")
@@ -292,13 +340,10 @@ def main():
     # 7. Visualisierungen
     create_visualizations(df_complete, feature_cols)
     
-    # 8. Export
+    # 8. Export als CSV
     print("[main] Exportiere finalen Datensatz...")
-    df_complete.to_parquet("out/features_complete.parquet", index=False)
-    print(f"  ✓ Gespeichert: out/features_complete.parquet")
-    
     df_complete.to_csv("out/features_complete.csv", index=False)
-    print(f"  ✓ Gespeichert: out/features_complete.csv\n")
+    print(f"  ✓ Gespeichert: out/features_complete.csv ({df_complete.shape})\n")
     
     # Zusammenfassung
     print("=" * 70)
@@ -309,8 +354,7 @@ def main():
     print(f"  • {len(feature_cols):,} aggregierte Features")
     print(f"  • {len(targets_df.columns)} Zielvariablen")
     print("\nExportierte Dateien:")
-    print("  • out/features_complete.parquet (Hauptdatei)")
-    print("  • out/features_complete.csv")
+    print("  • out/features_complete.csv (Hauptdatei)")
     print("  • out/feature_stats.csv")
     print("  • out/correlation.csv")
     print("  • out/correlation_heatmap.png")
