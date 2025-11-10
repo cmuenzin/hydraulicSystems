@@ -1,10 +1,10 @@
 # Hydraulic Systems - Data Preparation
 
-## � Was ist das hier?
+## Was ist das hier?
 
-Dieses Projekt bereitet den **UCI Hydraulic Systems Dataset** auf — ein Datensatz mit Sensor-Messungen von einem Hydraulik-Teststand.
+Dieses Projekt bereitet den **UCI Hydraulic Systems Dataset** auf, ein Datensatz mit Sensor-Messungen von einem Hydraulik-Teststand.
 
-**Die Challenge:** Die Rohdaten haben **43.680 Spalten**. Ja, richtig gelesen! 🤯
+**Die Challenge:** Die Rohdaten haben **43.680 Spalten**
 
 Das ist viel zu viel für sinnvolle Analysen. Deshalb machen wir hier **Feature Engineering** und reduzieren die Daten auf überschaubare **136 Features**.
 
@@ -208,6 +208,5 @@ HydraulicSystems/
 ---
 
 **Erstellt:** November 2025  
-**Level:** Data Preparation (Einsteiger-Modul)  
 **Ziel:** Zeitreihen → kompakte Features → sauberer Datensatz ✓
 
